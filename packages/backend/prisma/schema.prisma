@@ -1,0 +1,220 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== ORGANIZATION (TENANT) ====================
+
+model Organization {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  description String?
+  settings    Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  users     User[]
+  decisions Decision[]
+  invites   Invite[]
+
+  @@map("organizations")
+}
+
+// ==================== USER ====================
+
+model User {
+  id             String   @id @default(uuid())
+  email          String
+  passwordHash   String   @map("password_hash")
+  firstName      String   @map("first_name")
+  lastName       String   @map("last_name")
+  role           UserRole @default(MEMBER)
+  isActive       Boolean  @default(true) @map("is_active")
+  lastLoginAt    DateTime? @map("last_login_at")
+  organizationId String   @map("organization_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  decisions    Decision[]   @relation("DecisionCreator")
+  stakeholders Stakeholder[]
+  votes        Vote[]
+  comments     Comment[]
+
+  @@unique([email, organizationId])
+  @@index([organizationId])
+  @@index([email])
+  @@map("users")
+}
+
+enum UserRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+// ==================== DECISION ====================
+
+model Decision {
+  id               String           @id @default(uuid())
+  title            String
+  description      String?
+  category         DecisionCategory @default(OTHER)
+  status           DecisionStatus   @default(DRAFT)
+  deadline         DateTime?
+  selectedOptionId String?          @map("selected_option_id")
+  tags             String[]         @default([])
+  createdById      String           @map("created_by_id")
+  organizationId   String           @map("organization_id")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  createdBy    User          @relation("DecisionCreator", fields: [createdById], references: [id])
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  options      Option[]
+  stakeholders Stakeholder[]
+  votes        Vote[]
+  comments     Comment[]
+
+  @@index([organizationId])
+  @@index([status])
+  @@index([category])
+  @@index([createdById])
+  @@index([organizationId, status])
+  @@map("decisions")
+}
+
+enum DecisionStatus {
+  DRAFT
+  OPEN
+  IN_REVIEW
+  DECIDED
+  ARCHIVED
+}
+
+enum DecisionCategory {
+  STRATEGIC
+  OPERATIONAL
+  TACTICAL
+  TECHNICAL
+  FINANCIAL
+  HR
+  OTHER
+}
+
+// ==================== OPTION ====================
+
+model Option {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  decisionId  String   @map("decision_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  decision Decision @relation(fields: [decisionId], references: [id], onDelete: Cascade)
+  votes    Vote[]
+
+  @@index([decisionId])
+  @@map("options")
+}
+
+// ==================== STAKEHOLDER ====================
+
+model Stakeholder {
+  id         String          @id @default(uuid())
+  role       StakeholderRole @default(OBSERVER)
+  userId     String          @map("user_id")
+  decisionId String          @map("decision_id")
+  createdAt  DateTime        @default(now()) @map("created_at")
+  updatedAt  DateTime        @updatedAt @map("updated_at")
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  decision Decision @relation(fields: [decisionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, decisionId])
+  @@index([decisionId])
+  @@index([userId])
+  @@map("stakeholders")
+}
+
+enum StakeholderRole {
+  DECISION_MAKER
+  CONTRIBUTOR
+  REVIEWER
+  OBSERVER
+}
+
+// ==================== VOTE ====================
+
+model Vote {
+  id         String   @id @default(uuid())
+  type       VoteType
+  comment    String?
+  userId     String   @map("user_id")
+  decisionId String   @map("decision_id")
+  optionId   String   @map("option_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  decision Decision @relation(fields: [decisionId], references: [id], onDelete: Cascade)
+  option   Option   @relation(fields: [optionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, decisionId])
+  @@index([decisionId])
+  @@index([optionId])
+  @@map("votes")
+}
+
+enum VoteType {
+  APPROVE
+  REJECT
+  ABSTAIN
+}
+
+// ==================== COMMENT ====================
+
+model Comment {
+  id         String   @id @default(uuid())
+  content    String
+  userId     String   @map("user_id")
+  decisionId String   @map("decision_id")
+  parentId   String?  @map("parent_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  decision Decision  @relation(fields: [decisionId], references: [id], onDelete: Cascade)
+  parent   Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  replies  Comment[] @relation("CommentReplies")
+
+  @@index([decisionId])
+  @@index([userId])
+  @@map("comments")
+}
+
+// ==================== INVITE ====================
+
+model Invite {
+  id             String       @id @default(uuid())
+  email          String
+  role           UserRole     @default(MEMBER)
+  token          String       @unique
+  expiresAt      DateTime     @map("expires_at")
+  acceptedAt     DateTime?    @map("accepted_at")
+  organizationId String       @map("organization_id")
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([token])
+  @@map("invites")
+}
