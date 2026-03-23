@@ -29,8 +29,8 @@ npm-debug.log*
 coverage/
 
 # Prisma
-packages/backend/prisma/*.db
-packages/backend/prisma/*.db-journal
+backend/prisma/*.db
+backend/prisma/*.db-journal
 
 # Misc
 .turbo

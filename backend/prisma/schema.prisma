@@ -1,0 +1,211 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Organization {
+  id        String   @id @default(uuid())
+  name      String   @db.VarChar(255)
+  slug      String   @unique @db.VarChar(100)
+  plan      String   @default("free") @db.VarChar(50)
+  settings  Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  users              User[]
+  teamMembers        TeamMember[]
+  meetings           Meeting[]
+  minutes            Minute[]
+  agreements         Agreement[]
+  googleSheetsExport GoogleSheetsExport[]
+  notifications      Notification[]
+  auditLogs          AuditLog[]
+
+  @@map("organizations")
+}
+
+model User {
+  id               String   @id @default(uuid())
+  organizationId   String   @map("organization_id")
+  email            String   @db.VarChar(255)
+  passwordHash     String   @map("password_hash") @db.VarChar(255)
+  name             String   @db.VarChar(255)
+  role             String   @default("admin") @db.VarChar(50)
+  telegramId       String?  @map("telegram_id") @db.VarChar(50)
+  telegramUsername  String?  @map("telegram_username") @db.VarChar(100)
+  isActive         Boolean  @default(true) @map("is_active")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  organization          Organization[]         @relation()
+  createdMeetings       Meeting[]              @relation("MeetingCreator")
+  meetingParticipations MeetingParticipant[]
+  createdMinutes        Minute[]               @relation("MinuteCreator")
+  assignedAgreements    Agreement[]            @relation("AgreementAssignedUser")
+  auditLogs             AuditLog[]
+
+  @@unique([organizationId, email])
+  @@index([organizationId])
+  @@map("users")
+}
+
+model TeamMember {
+  id               String   @id @default(uuid())
+  organizationId   String   @map("organization_id")
+  telegramId       String   @map("telegram_id") @db.VarChar(50)
+  telegramUsername  String?  @map("telegram_username") @db.VarChar(100)
+  name             String?  @db.VarChar(255)
+  email            String?  @db.VarChar(255)
+  isActive         Boolean  @default(true) @map("is_active")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  organization          Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  meetingParticipations MeetingParticipant[]
+  assignedAgreements    Agreement[]            @relation("AgreementAssignedMember")
+
+  @@unique([organizationId, telegramId])
+  @@index([organizationId])
+  @@index([telegramId])
+  @@map("team_members")
+}
+
+model Meeting {
+  id              String   @id @default(uuid())
+  organizationId  String   @map("organization_id")
+  title           String   @db.VarChar(500)
+  description     String?  @db.Text
+  agenda          String?  @db.Text
+  scheduledAt     DateTime @map("scheduled_at")
+  durationMinutes Int      @default(60) @map("duration_minutes")
+  status          String   @default("scheduled") @db.VarChar(50)
+  location        String?  @db.VarChar(255)
+  createdById     String?  @map("created_by")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User?                @relation("MeetingCreator", fields: [createdById], references: [id])
+  participants MeetingParticipant[]
+  minute       Minute?
+  agreements   Agreement[]
+
+  @@index([organizationId])
+  @@index([status])
+  @@map("meetings")
+}
+
+model MeetingParticipant {
+  id               String  @id @default(uuid())
+  meetingId        String  @map("meeting_id")
+  userId           String? @map("user_id")
+  teamMemberId     String? @map("team_member_id")
+  role             String  @default("attendee") @db.VarChar(50)
+  attendanceStatus String  @default("pending") @map("attendance_status") @db.VarChar(50)
+
+  meeting    Meeting     @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  user       User?       @relation(fields: [userId], references: [id])
+  teamMember TeamMember? @relation(fields: [teamMemberId], references: [id])
+
+  @@map("meeting_participants")
+}
+
+model Minute {
+  id              String    @id @default(uuid())
+  organizationId  String    @map("organization_id")
+  meetingId       String    @unique @map("meeting_id")
+  content         String    @db.Text
+  summary         String?   @db.Text
+  topicsDiscussed String[]  @map("topics_discussed")
+  status          String    @default("draft") @db.VarChar(50)
+  createdById     String?   @map("created_by")
+  publishedAt     DateTime? @map("published_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  meeting      Meeting      @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  createdBy    User?        @relation("MinuteCreator", fields: [createdById], references: [id])
+  agreements   Agreement[]
+
+  @@map("minutes")
+}
+
+model Agreement {
+  id               String    @id @default(uuid())
+  organizationId   String    @map("organization_id")
+  meetingId        String?   @map("meeting_id")
+  minuteId         String?   @map("minute_id")
+  title            String    @db.VarChar(500)
+  description      String?   @db.Text
+  assignedToUserId String?   @map("assigned_to_user")
+  assignedToMemberId String? @map("assigned_to_member")
+  dueDate          DateTime? @map("due_date") @db.Date
+  priority         String    @default("medium") @db.VarChar(50)
+  status           String    @default("pending") @db.VarChar(50)
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  completedAt      DateTime? @map("completed_at")
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  meeting        Meeting?     @relation(fields: [meetingId], references: [id], onDelete: SetNull)
+  minute         Minute?      @relation(fields: [minuteId], references: [id], onDelete: Cascade)
+  assignedToUser User?        @relation("AgreementAssignedUser", fields: [assignedToUserId], references: [id])
+  assignedToMember TeamMember? @relation("AgreementAssignedMember", fields: [assignedToMemberId], references: [id])
+
+  @@index([organizationId])
+  @@index([assignedToUserId, assignedToMemberId])
+  @@index([status])
+  @@map("agreements")
+}
+
+model GoogleSheetsExport {
+  id             String    @id @default(uuid())
+  organizationId String    @map("organization_id")
+  spreadsheetId  String    @map("spreadsheet_id") @db.VarChar(255)
+  sheetName      String    @default("Agreements") @map("sheet_name") @db.VarChar(255)
+  accessToken    String?   @map("access_token") @db.Text
+  refreshToken   String?   @map("refresh_token") @db.Text
+  tokenExpiry    DateTime? @map("token_expiry")
+  lastSyncAt     DateTime? @map("last_sync_at")
+  syncEnabled    Boolean   @default(true) @map("sync_enabled")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("google_sheets_exports")
+}
+
+model Notification {
+  id                  String    @id @default(uuid())
+  organizationId      String    @map("organization_id")
+  recipientTelegramId String    @map("recipient_telegram_id") @db.VarChar(50)
+  messageType         String    @map("message_type") @db.VarChar(50)
+  messageContent      String    @map("message_content") @db.Text
+  sentAt              DateTime  @default(now()) @map("sent_at")
+  readAt              DateTime? @map("read_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model AuditLog {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  userId         String?  @map("user_id")
+  action         String   @db.VarChar(100)
+  entityType     String?  @map("entity_type") @db.VarChar(50)
+  entityId       String?  @map("entity_id")
+  details        Json?
+  ipAddress      String?  @map("ip_address") @db.VarChar(45)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}
