@@ -1,0 +1,19 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: coda-backend
+  namespace: coda-prod
+  labels:
+    app: coda-backend
+spec:
+  host: coda.heybanco.local
+  to:
+    kind: Service
+    name: coda-backend
+    weight: 100
+  port:
+    targetPort: 3000-tcp
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+  wildcardPolicy: None
