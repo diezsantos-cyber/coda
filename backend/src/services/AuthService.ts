@@ -17,7 +17,7 @@ interface LoginInput {
 }
 
 export class AuthService {
-  async register(input: RegisterInput): Promise<{ token: string; user: { id: string; email: string; name: string; role: string; organizationId: string } }> {
+  async register(input: RegisterInput): Promise<{ token: string; user: { id: string; email: string; name: string; role: string; organization: { id: string; name: string; slug: string } } }> {
     const slug = generateSlug(input.organizationName);
 
     const existingOrg = await prisma.organization.findUnique({ where: { slug } });
@@ -56,14 +56,19 @@ export class AuthService {
         email: result.user.email,
         name: result.user.name,
         role: result.user.role,
-        organizationId: result.org.id,
+        organization: {
+          id: result.org.id,
+          name: result.org.name,
+          slug: result.org.slug,
+        },
       },
     };
   }
 
-  async login(input: LoginInput): Promise<{ token: string; user: { id: string; email: string; name: string; role: string; organizationId: string } }> {
+  async login(input: LoginInput): Promise<{ token: string; user: { id: string; email: string; name: string; role: string; organization: { id: string; name: string; slug: string } } }> {
     const user = await prisma.user.findFirst({
       where: { email: input.email.toLowerCase(), isActive: true },
+      include: { organization: true },
     });
 
     if (!user) {
@@ -84,7 +89,11 @@ export class AuthService {
         email: user.email,
         name: user.name,
         role: user.role,
-        organizationId: user.organizationId,
+        organization: {
+          id: user.organization.id,
+          name: user.organization.name,
+          slug: user.organization.slug,
+        },
       },
     };
   }
@@ -99,11 +108,6 @@ export class AuthService {
       throw new NotFoundError('User', userId);
     }
 
-    const org = user.organization[0];
-    if (!org) {
-      throw new NotFoundError('Organization');
-    }
-
     return {
       id: user.id,
       email: user.email,
@@ -111,9 +115,9 @@ export class AuthService {
       role: user.role,
       organizationId: user.organizationId,
       organization: {
-        id: org.id,
-        name: org.name,
-        slug: org.slug,
+        id: user.organization.id,
+        name: user.organization.name,
+        slug: user.organization.slug,
       },
     };
   }
