@@ -10,6 +10,7 @@ const navItems = [
   { href: '/dashboard/meetings', label: 'Reuniones' },
   { href: '/dashboard/agreements', label: 'Acuerdos' },
   { href: '/dashboard/team', label: 'Equipo' },
+  { href: '/dashboard/settings', label: 'Configuración' },
 ];
 
 export function Navbar() {
