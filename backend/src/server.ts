@@ -8,6 +8,7 @@ import { config } from './config';
 import { connectDatabase, disconnectDatabase } from './config/database';
 import routes from './routes';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
+import { calendarSyncScheduler } from './services/CalendarSyncScheduler';
 
 const app = express();
 
@@ -53,6 +54,9 @@ async function start(): Promise<void> {
   try {
     await connectDatabase();
 
+    // Start calendar sync scheduler
+    calendarSyncScheduler.start();
+
     app.listen(config.port, () => {
       console.info(`CODA API server running on port ${config.port}`);
       console.info(`Environment: ${config.nodeEnv}`);
@@ -67,6 +71,7 @@ async function start(): Promise<void> {
 // Graceful shutdown
 function shutdown(signal: string): void {
   console.info(`${signal} received. Shutting down...`);
+  calendarSyncScheduler.stop();
   void disconnectDatabase().then(() => {
     process.exit(0);
   });

@@ -14,14 +14,47 @@ export default function SettingsPage() {
     alert('Telegram bot token guardado. Implementar llamada al backend.');
   };
 
-  const handleConnectGoogleCalendar = () => {
-    // TODO: Implement OAuth flow
-    alert('Implementar flujo OAuth de Google Calendar');
+  const handleConnectGoogleCalendar = async () => {
+    try {
+      const response = await fetch('/api/integrations/google/calendar/auth', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+      const data = await response.json();
+      if (data.success && data.data.authUrl) {
+        // Open OAuth window
+        window.location.href = data.data.authUrl;
+      } else {
+        alert('Error al generar URL de autenticación');
+      }
+    } catch (error) {
+      console.error(error);
+      alert('Error al conectar Google Calendar');
+    }
   };
 
-  const handleConnectGoogleSheets = () => {
-    // TODO: Implement OAuth flow
-    alert('Implementar flujo OAuth de Google Sheets');
+  const handleConnectGoogleSheets = async () => {
+    try {
+      const response = await fetch('/api/integrations/google/auth', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+      const data = await response.json();
+      if (data.success && data.data.authUrl) {
+        window.location.href = data.data.authUrl;
+      } else {
+        alert('Error al generar URL de autenticación');
+      }
+    } catch (error) {
+      console.error(error);
+      alert('Error al conectar Google Sheets');
+    }
   };
 
   return (

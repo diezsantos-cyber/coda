@@ -21,6 +21,16 @@ export const config = {
     clientSecret: process.env['GOOGLE_CLIENT_SECRET'] ?? '',
     redirectUri: process.env['GOOGLE_REDIRECT_URI'] ?? 'http://localhost:3001/api/integrations/google/callback',
   },
+  googleCalendar: {
+    clientId: process.env['GOOGLE_CLIENT_ID'] ?? '',
+    clientSecret: process.env['GOOGLE_CLIENT_SECRET'] ?? '',
+    redirectUri: process.env['GOOGLE_CALENDAR_REDIRECT_URI'] ?? 'http://localhost:3001/api/integrations/google/calendar/callback',
+  },
+  googleSheets: {
+    clientId: process.env['GOOGLE_CLIENT_ID'] ?? '',
+    clientSecret: process.env['GOOGLE_CLIENT_SECRET'] ?? '',
+    redirectUri: process.env['GOOGLE_SHEETS_REDIRECT_URI'] ?? 'http://localhost:3001/api/integrations/google/sheets/callback',
+  },
   rateLimit: {
     windowMs: 15 * 60 * 1000,
     max: 100,
