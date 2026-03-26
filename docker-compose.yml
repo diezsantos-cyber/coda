@@ -1,50 +1,57 @@
 version: '3.8'
-
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:15-alpine
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
       POSTGRES_DB: coda
+      POSTGRES_USER: coda
+      POSTGRES_PASSWORD: dev_password
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U coda"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 5s
       retries: 5
 
   backend:
-    build:
-      context: ./packages/backend
-      dockerfile: Dockerfile
+    build: ./backend
     ports:
-      - "4000:4000"
+      - "3001:3001"
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/coda?schema=public
-      JWT_SECRET: change-this-in-production
-      JWT_REFRESH_SECRET: change-this-refresh-in-production
-      PORT: 4000
-      NODE_ENV: production
+      DATABASE_URL: postgresql://coda:dev_password@postgres:5432/coda
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: dev_secret_change_in_production
+      JWT_EXPIRES_IN: "24h"
+      PORT: "3001"
+      NODE_ENV: development
       CORS_ORIGIN: http://localhost:3000
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
     depends_on:
       postgres:
         condition: service_healthy
-    command: >
-      sh -c "npx prisma migrate deploy && node dist/index.js"
+      redis:
+        condition: service_healthy
 
   dashboard:
-    build:
-      context: ./packages/dashboard
-      dockerfile: Dockerfile
+    build: ./dashboard
     ports:
       - "3000:3000"
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:4000/api/v1
-      NEXT_PUBLIC_WS_URL: ws://localhost:4000/ws
+      NEXT_PUBLIC_API_URL: http://localhost:3001/api
     depends_on:
       - backend
 
